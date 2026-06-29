@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { canResumePlan } from '../services/storage'
 import type { LifePlan, PlanStatus } from '../types'
 
 const props = defineProps<{
@@ -148,6 +149,12 @@ function onFileChange(event: Event) {
           <div class="min-w-0 flex-1">
             <div class="flex flex-wrap items-center gap-2 mb-1">
               <h3 class="text-sm sm:text-base font-semibold text-slate-800 truncate">{{ plan.goal }}</h3>
+              <span
+                v-if="canResumePlan(plan)"
+                class="text-[10px] px-2 py-0.5 rounded-full font-medium bg-amber-50 text-amber-700"
+              >
+                未完成
+              </span>
               <span
                 class="text-[10px] px-2 py-0.5 rounded-full font-medium"
                 :class="plan.status === 'archived'

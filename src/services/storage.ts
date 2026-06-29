@@ -1,4 +1,5 @@
 import type { AppSettings, LifePlan, PlanRecordExport } from '../types'
+import { inferCompletedAgents, inferGenerationState } from './planState'
 
 const SETTINGS_KEY = 'life-planner-settings'
 const PLANS_KEY = 'life-planner-plans'
@@ -17,6 +18,9 @@ function uid(): string {
 
 export function normalizePlan(raw: Partial<LifePlan>): LifePlan {
   const createdAt = raw.createdAt ?? Date.now()
+  const completedAgents = Array.isArray(raw.completedAgents) && raw.completedAgents.length
+    ? raw.completedAgents
+    : inferCompletedAgents(raw)
   return {
     id: raw.id ?? uid(),
     goal: raw.goal ?? '',
@@ -29,6 +33,8 @@ export function normalizePlan(raw: Partial<LifePlan>): LifePlan {
     document: raw.document ?? '',
     note: raw.note ?? '',
     status: raw.status === 'archived' ? 'archived' : 'active',
+    generationState: inferGenerationState({ ...raw, completedAgents }),
+    completedAgents,
   }
 }
 
@@ -57,6 +63,8 @@ export function loadPlans(): LifePlan[] {
     return []
   }
 }
+
+export { inferCompletedAgents, isPlanComplete, canResumePlan, normalizeInterruptedPlans } from './planState'
 
 export function savePlans(plans: LifePlan[]): void {
   try {

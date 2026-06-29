@@ -1,17 +1,26 @@
 import { ref } from 'vue'
 import { orchestratePlan } from '../agents/orchestrator'
 import {
+  canResumePlan,
   downloadJson,
   exportPlanRecords,
   loadPlans,
+  normalizeInterruptedPlans,
   normalizePlan,
   parseImportedRecords,
   savePlans,
 } from '../services/storage'
+import { isPlanComplete } from '../services/planState'
 import { useSettings } from './useSettings'
 import type { AgentStatus, LifePlan, PlanStatus } from '../types'
 
-const plans = ref<LifePlan[]>(loadPlans())
+const rawLoaded = loadPlans()
+const initialPlans = normalizeInterruptedPlans(rawLoaded)
+if (initialPlans.some((_, i) => rawLoaded[i]?.generationState === 'generating')) {
+  savePlans(initialPlans)
+}
+
+const plans = ref<LifePlan[]>(initialPlans)
 const currentPlan = ref<LifePlan | null>(plans.value[0] ?? null)
 const planning = ref(false)
 const agentStatuses = ref<AgentStatus[]>([])
@@ -20,16 +29,6 @@ let persistTimer: ReturnType<typeof setTimeout> | null = null
 
 function touchPlan(plan: LifePlan): LifePlan {
   return { ...plan, updatedAt: Date.now() }
-}
-
-function isMeaningfulPlan(plan: LifePlan): boolean {
-  return !!(
-    plan.motivation.trim()
-    || plan.overview.trim()
-    || plan.document.trim()
-    || plan.timeline.length
-    || plan.tasks.length
-  )
 }
 
 function persistPlans(immediate = false) {
@@ -80,11 +79,88 @@ function syncCurrent(planId: string, updater: (plan: LifePlan) => LifePlan) {
 export function usePlan() {
   const { settings } = useSettings()
 
+  async function runOrchestration(plan: LifePlan, isResume: boolean): Promise<LifePlan | null> {
+    const targetId = plan.id
+    planning.value = true
+    if (!isResume) agentStatuses.value = []
+
+    const working = normalizePlan({
+      ...plan,
+      generationState: 'generating',
+      updatedAt: Date.now(),
+    })
+
+    // 会话内累积状态，避免并发智能体互相覆盖，也避免切换 currentPlan 时写错档案
+    let sessionPlan = working
+
+    const applyPatch = (patch: Partial<LifePlan>) => {
+      sessionPlan = normalizePlan({
+        ...sessionPlan,
+        ...patch,
+        id: targetId,
+        goal: plan.goal,
+        createdAt: plan.createdAt,
+        note: plan.note,
+        status: plan.status,
+        generationState: 'generating',
+        updatedAt: Date.now(),
+      })
+      upsertPlan(sessionPlan)
+      if (currentPlan.value?.id === targetId) {
+        currentPlan.value = { ...sessionPlan }
+      }
+    }
+
+    currentPlan.value = working
+    upsertPlan(working, true)
+
+    try {
+      const result = await orchestratePlan(
+        settings.value,
+        plan.goal,
+        (statuses) => {
+          agentStatuses.value = statuses
+        },
+        applyPatch,
+        isResume ? sessionPlan : undefined,
+      )
+
+      const finalPlan = normalizePlan({
+        ...result,
+        id: targetId,
+        goal: plan.goal,
+        createdAt: plan.createdAt,
+        updatedAt: Date.now(),
+        note: plan.note,
+        status: plan.status,
+        generationState: 'completed',
+      })
+
+      sessionPlan = finalPlan
+      if (currentPlan.value?.id === targetId) {
+        currentPlan.value = finalPlan
+      }
+      upsertPlan(finalPlan, true)
+      return finalPlan
+    } catch (err) {
+      const partial = normalizePlan({
+        ...sessionPlan,
+        generationState: 'interrupted',
+        updatedAt: Date.now(),
+      })
+      sessionPlan = partial
+      if (currentPlan.value?.id === targetId) {
+        currentPlan.value = partial
+      }
+      upsertPlan(partial, true)
+      throw err
+    } finally {
+      planning.value = false
+    }
+  }
+
   async function generatePlan(goal: string): Promise<LifePlan | null> {
     if (!goal.trim() || planning.value) return null
-
-    planning.value = true
-    agentStatuses.value = []
 
     const now = Date.now()
     const draft = normalizePlan({
@@ -93,53 +169,27 @@ export function usePlan() {
       createdAt: now,
       updatedAt: now,
       status: 'active',
+      generationState: 'generating',
+      completedAgents: [],
     })
-    currentPlan.value = draft
-    upsertPlan(draft, true)
 
-    try {
-      const plan = await orchestratePlan(
-        settings.value,
-        goal.trim(),
-        (statuses) => {
-          agentStatuses.value = statuses
-        },
-        (patch) => {
-          const next = normalizePlan({
-            ...(currentPlan.value ?? draft),
-            ...patch,
-            updatedAt: Date.now(),
-          })
-          currentPlan.value = next
-          upsertPlan(next)
-        },
-      )
+    return runOrchestration(draft, false)
+  }
 
-      const finalPlan = normalizePlan({
-        ...plan,
-        id: draft.id,
-        createdAt: draft.createdAt,
-        updatedAt: Date.now(),
-        note: draft.note,
-        status: draft.status,
-      })
+  async function resumePlan(planId?: string): Promise<LifePlan | null> {
+    if (planning.value) return null
 
-      currentPlan.value = finalPlan
-      upsertPlan(finalPlan, true)
-      return finalPlan
-    } catch (err) {
-      if (currentPlan.value && isMeaningfulPlan(currentPlan.value)) {
-        upsertPlan(currentPlan.value, true)
-      } else {
-        currentPlan.value = plans.value[0] ?? null
-      }
-      throw err
-    } finally {
-      planning.value = false
-    }
+    const target = planId
+      ? plans.value.find((p) => p.id === planId)
+      : currentPlan.value
+
+    if (!target || !canResumePlan(target)) return null
+
+    return runOrchestration(target, true)
   }
 
   function selectPlan(plan: LifePlan) {
+    if (planning.value) return
     currentPlan.value = plan
   }
 
@@ -204,7 +254,7 @@ export function usePlan() {
   }
 
   function reloadPlans() {
-    plans.value = loadPlans()
+    plans.value = normalizeInterruptedPlans(loadPlans())
     if (currentPlan.value) {
       const latest = plans.value.find((p) => p.id === currentPlan.value!.id)
       currentPlan.value = latest ?? plans.value[0] ?? null
@@ -219,12 +269,17 @@ export function usePlan() {
     return Math.round((done / plan.tasks.length) * 100)
   }
 
+  function interruptedPlans() {
+    return plans.value.filter((p) => canResumePlan(p))
+  }
+
   return {
     plans,
     currentPlan,
     planning,
     agentStatuses,
     generatePlan,
+    resumePlan,
     selectPlan,
     toggleTask,
     updateNote,
@@ -235,5 +290,8 @@ export function usePlan() {
     importRecords,
     taskProgress,
     reloadPlans,
+    interruptedPlans,
+    canResumePlan,
+    isPlanComplete,
   }
 }

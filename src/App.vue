@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import AppHeader from './components/AppHeader.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import ChatView from './components/ChatView.vue'
@@ -16,6 +16,7 @@ const {
   planning,
   agentStatuses,
   generatePlan,
+  resumePlan,
   selectPlan,
   toggleTask,
   updateNote,
@@ -26,6 +27,7 @@ const {
   importRecords,
   taskProgress,
   reloadPlans,
+  interruptedPlans,
 } = usePlan()
 
 const showSettings = ref(false)
@@ -53,9 +55,38 @@ async function handleGeneratePlan(goal: string) {
     await generatePlan(goal)
     showToast('规划已生成并保存到本地档案')
   } catch (err) {
-    showToast(err instanceof Error ? err.message : '规划生成失败', 5000)
+    showToast(
+      err instanceof Error ? err.message : '规划生成中断，可点击「继续生成」从断点续传',
+      5000,
+    )
   }
 }
+
+async function handleResumePlan(planId: string) {
+  if (!configured.value) {
+    showToast('请先配置豆包 API Key')
+    showSettings.value = true
+    return
+  }
+
+  activeView.value = 'plan'
+  try {
+    await resumePlan(planId)
+    showToast('规划已续传完成并保存')
+  } catch (err) {
+    showToast(
+      err instanceof Error ? err.message : '续传中断，可再次点击「继续生成」',
+      5000,
+    )
+  }
+}
+
+onMounted(() => {
+  const pending = interruptedPlans()
+  if (pending.length) {
+    showToast(`有 ${pending.length} 份规划未完成，可点击「继续生成」续传`, 5000)
+  }
+})
 
 function handleDelete(planId: string) {
   if (confirm('确定删除这份规划档案吗？此操作不可恢复。')) {
@@ -151,6 +182,7 @@ async function handleImport(file: File, mode: 'merge' | 'replace') {
           :planning="planning"
           :agent-statuses="agentStatuses"
           @generate="handleGeneratePlan"
+          @resume="handleResumePlan"
           @select="selectPlan"
           @toggle-task="toggleTask"
           @delete="handleDelete"

@@ -21,6 +21,8 @@ export type AgentRole =
   | 'document'
   | 'orchestrator'
 
+export type GenerationState = 'pending' | 'generating' | 'completed' | 'interrupted'
+
 export interface AgentStatus {
   role: AgentRole
   name: string
@@ -60,6 +62,8 @@ export interface LifePlan {
   document: string
   note: string
   status: PlanStatus
+  generationState: GenerationState
+  completedAgents: AgentRole[]
 }
 
 export interface PlanRecordExport {
@@ -79,3 +83,11 @@ export interface StreamCallbacks {
   onDone: (fullText: string) => void
   onError: (error: Error) => void
 }
+
+export const REQUIRED_AGENTS: AgentRole[] = [
+  'motivation',
+  'planner',
+  'timeline',
+  'tasks',
+  'document',
+]

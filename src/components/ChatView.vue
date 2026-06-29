@@ -8,6 +8,7 @@ const emit = defineEmits<{
 
 const { messages, loading, sendMessage, clearHistory } = useChat()
 const input = ref('')
+const chatScroll = ref<HTMLElement>()
 const chatEnd = ref<HTMLElement>()
 
 const suggestions = [
@@ -17,10 +18,26 @@ const suggestions = [
   '我想考研上岸，同时保持身体健康',
 ]
 
+function scrollChatToBottom(smooth = false) {
+  requestAnimationFrame(() => {
+    const container = chatScroll.value
+    if (!container) return
+    container.scrollTo({
+      top: container.scrollHeight,
+      behavior: smooth ? 'smooth' : 'auto',
+    })
+    if (!smooth) {
+      requestAnimationFrame(() => {
+        container.scrollTop = container.scrollHeight
+      })
+    }
+  })
+}
+
 watch(messages, async () => {
   await nextTick()
-  chatEnd.value?.scrollIntoView({ behavior: 'smooth' })
-}, { deep: true })
+  scrollChatToBottom(!loading.value)
+}, { deep: true, flush: 'post' })
 
 async function handleSend() {
   const text = input.value.trim()
@@ -43,7 +60,7 @@ function useSuggestion(text: string) {
 
 <template>
   <div class="flex flex-col h-full">
-    <div class="flex-1 overflow-y-auto px-4 sm:px-0 py-4 space-y-4">
+    <div ref="chatScroll" class="flex-1 overflow-y-auto px-4 sm:px-0 py-4 space-y-4 min-h-0">
       <div v-if="messages.length === 0" class="text-center py-8 sm:py-12">
         <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-100 to-indigo-100 text-2xl mb-4">
           ✨

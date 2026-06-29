@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { AgentStatus } from '../types'
 import { AGENT_META } from '../agents/prompts'
+import LoadingSpinner from './LoadingSpinner.vue'
 
 defineProps<{
   statuses: AgentStatus[]
@@ -9,32 +10,38 @@ defineProps<{
 
 const statusIcon: Record<string, string> = {
   idle: '○',
-  running: '●',
+  running: '',
   done: '✓',
   error: '!',
 }
 
-const statusColor: Record<string, string> = {
-  idle: 'text-slate-300',
-  running: 'text-indigo-500 animate-pulse-soft',
-  done: 'text-emerald-500',
-  error: 'text-red-400',
+const chipClass: Record<string, string> = {
+  idle: 'bg-slate-50 text-slate-400 border-slate-100',
+  running: 'bg-indigo-50 text-indigo-600 border-indigo-200 agent-step-running-indigo',
+  done: 'bg-emerald-50 text-emerald-600 border-emerald-100',
+  error: 'bg-red-50 text-red-500 border-red-100',
 }
 </script>
 
 <template>
   <div v-if="planning || statuses.some(s => s.status !== 'idle')" class="mb-4 animate-slide-up">
-    <p class="text-xs text-slate-500 mb-2 font-medium">智能体协同工作中...</p>
+    <div class="flex items-center gap-2 mb-2">
+      <LoadingSpinner v-if="planning" size="xs" />
+      <p class="text-xs text-slate-500 font-medium">
+        智能体并发协同中（无依赖任务并行执行）...
+      </p>
+    </div>
     <div class="flex flex-wrap gap-2">
       <div
         v-for="s in statuses"
         :key="s.role"
-        class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white/80 rounded-full text-xs"
-        :class="statusColor[s.status]"
+        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border transition-all"
+        :class="chipClass[s.status]"
       >
-        <span>{{ AGENT_META[s.role]?.icon }}</span>
-        <span class="text-slate-600">{{ s.name }}</span>
-        <span class="font-mono">{{ statusIcon[s.status] }}</span>
+        <LoadingSpinner v-if="s.status === 'running'" size="xs" />
+        <span v-else>{{ AGENT_META[s.role]?.icon }}</span>
+        <span>{{ s.name }}</span>
+        <span v-if="s.status !== 'running'" class="font-mono text-[10px]">{{ statusIcon[s.status] }}</span>
       </div>
     </div>
   </div>
