@@ -36,6 +36,28 @@ Built on the [Volcengine Ark Doubao Chat API](https://www.volcengine.com/docs/82
 
 ---
 
+## Screenshots
+
+### Chat — speak your ambition
+
+![Chat interface](./docs/screenshots/chat.png)
+
+Start with a goal, explore suggested prompts, and let the assistant guide you toward a fuller plan.
+
+### Plan — timeline across years
+
+![Planning timeline](./docs/screenshots/timeline.png)
+
+Multi-agent output becomes a phased roadmap with milestones, tasks, and exportable documents.
+
+### Records — local career archive
+
+![Local records](./docs/screenshots/records.png)
+
+Every plan is saved locally. Search, annotate, export, import, and revisit your journey anytime.
+
+---
+
 ## Quick Start
 
 ### Requirements
@@ -72,6 +94,7 @@ npm run preview  # preview build
 
 ```
 ├── docs/                 # Documentation
+│   └── screenshots/      # README preview images
 ├── public/               # Static assets
 ├── src/
 │   ├── agents/           # Multi-agent prompts & orchestration
