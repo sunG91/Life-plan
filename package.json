@@ -1,0 +1,36 @@
+{
+  "name": "life-planner",
+  "version": "1.0.0",
+  "description": "Life Plan - an AI career planning assistant for exploring uncertain but promising life paths",
+  "author": {
+    "name": "孙瑞",
+    "email": "sunr20050503@163.com",
+    "url": "https://www.ddup.pro"
+  },
+  "homepage": "https://www.ddup.pro",
+  "license": "MIT",
+  "private": false,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "html2canvas": "^1.4.1",
+    "jspdf": "^3.0.1",
+    "marked": "^15.0.12",
+    "vue": "^3.5.17"
+  },
+  "devDependencies": {
+    "@rollup/rollup-win32-x64-msvc": "^4.44.2",
+    "@vitejs/plugin-vue": "^6.0.0",
+    "@vue/tsconfig": "^0.7.0",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17",
+    "typescript": "~5.8.3",
+    "vite": "^6.3.5",
+    "vue-tsc": "^2.2.10"
+  }
+}
