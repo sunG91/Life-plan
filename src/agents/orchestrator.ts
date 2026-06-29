@@ -1,4 +1,5 @@
-import { chatCompletion } from '../services/doubao'
+import { chatCompletion, chatCompletionStream } from '../services/doubao'
+import { normalizePlan } from '../services/storage'
 import type {
   AgentRole,
   AgentStatus,
@@ -16,6 +17,7 @@ import {
 } from './prompts'
 
 export type StatusCallback = (statuses: AgentStatus[]) => void
+export type PlanProgressCallback = (patch: Partial<LifePlan>) => void
 
 function uid(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
@@ -47,10 +49,35 @@ function initStatuses(): AgentStatus[] {
   }))
 }
 
+function streamText(
+  settings: AppSettings,
+  messages: { role: 'system' | 'user' | 'assistant'; content: string }[],
+  options: { temperature?: number; maxTokens?: number },
+  onText: (text: string) => void,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let text = ''
+    chatCompletionStream(
+      settings,
+      messages,
+      {
+        onToken: (token) => {
+          text += token
+          onText(text)
+        },
+        onDone: (fullText) => resolve(fullText || text),
+        onError: reject,
+      },
+      options,
+    ).catch(reject)
+  })
+}
+
 export async function orchestratePlan(
   settings: AppSettings,
   userGoal: string,
   onStatus: StatusCallback,
+  onProgress?: PlanProgressCallback,
 ): Promise<LifePlan> {
   const statuses = initStatuses()
   const update = (role: AgentRole, patch: Partial<AgentStatus>) => {
@@ -60,20 +87,22 @@ export async function orchestratePlan(
   }
 
   update('motivation', { status: 'running' })
-  const motivation = await chatCompletion(settings, [
+  const motivation = await streamText(settings, [
     { role: 'system', content: MOTIVATION_SYSTEM },
     { role: 'user', content: `用户的人生目标：${userGoal}\n\n请给出温暖的励志开场。` },
-  ], { temperature: 0.85, maxTokens: 512 })
+  ], { temperature: 0.85, maxTokens: 512 }, (text) => onProgress?.({ motivation: text }))
+  onProgress?.({ motivation })
   update('motivation', { status: 'done' })
 
   update('planner', { status: 'running' })
-  const overview = await chatCompletion(settings, [
+  const overview = await streamText(settings, [
     { role: 'system', content: PLANNER_SYSTEM },
     {
       role: 'user',
       content: `用户目标：${userGoal}\n\n请制定详细的最佳路线规划。`,
     },
-  ], { temperature: 0.7, maxTokens: 3000 })
+  ], { temperature: 0.7, maxTokens: 3000 }, (text) => onProgress?.({ overview: text }))
+  onProgress?.({ overview })
   update('planner', { status: 'done' })
 
   const context = `用户目标：${userGoal}\n\n路线规划：\n${overview}`
@@ -82,33 +111,48 @@ export async function orchestratePlan(
   update('tasks', { status: 'running' })
   update('document', { status: 'running' })
 
-  const [timelineRaw, tasksRaw, document] = await Promise.all([
+  const [timeline, tasks, document] = await Promise.all([
     chatCompletion(settings, [
       { role: 'system', content: TIMELINE_SYSTEM },
       { role: 'user', content: context },
     ], { temperature: 0.5, maxTokens: 2000 }).then((r) => {
+      const timelineData = parseJson<{ phases: Omit<TimelinePhase, 'id'>[] }>(r)
+      const phases: TimelinePhase[] = (timelineData?.phases ?? []).map((p) => ({
+        ...p,
+        id: uid(),
+      }))
+      onProgress?.({ timeline: phases })
       update('timeline', { status: 'done' })
-      return r
+      return phases
     }).catch((e) => {
       update('timeline', { status: 'error', message: e.message })
-      return ''
+      return []
     }),
 
     chatCompletion(settings, [
       { role: 'system', content: TASKS_SYSTEM },
       { role: 'user', content: context },
     ], { temperature: 0.5, maxTokens: 2000 }).then((r) => {
+      const tasksData = parseJson<{ tasks: Omit<TaskItem, 'id' | 'completed'>[] }>(r)
+      const items: TaskItem[] = (tasksData?.tasks ?? []).map((t) => ({
+        ...t,
+        id: uid(),
+        completed: false,
+        priority: t.priority ?? 'medium',
+      }))
+      onProgress?.({ tasks: items })
       update('tasks', { status: 'done' })
-      return r
+      return items
     }).catch((e) => {
       update('tasks', { status: 'error', message: e.message })
-      return ''
+      return []
     }),
 
-    chatCompletion(settings, [
+    streamText(settings, [
       { role: 'system', content: DOCUMENT_SYSTEM },
       { role: 'user', content: `${context}\n\n请生成完整规划文档。` },
-    ], { temperature: 0.6, maxTokens: 4000 }).then((r) => {
+    ], { temperature: 0.6, maxTokens: 4000 }, (text) => onProgress?.({ document: text })).then((r) => {
+      onProgress?.({ document: r })
       update('document', { status: 'done' })
       return r
     }).catch((e) => {
@@ -117,29 +161,17 @@ export async function orchestratePlan(
     }),
   ])
 
-  const timelineData = parseJson<{ phases: Omit<TimelinePhase, 'id'>[] }>(timelineRaw)
-  const tasksData = parseJson<{ tasks: Omit<TaskItem, 'id' | 'completed'>[] }>(tasksRaw)
-
-  const timeline: TimelinePhase[] = (timelineData?.phases ?? []).map((p) => ({
-    ...p,
-    id: uid(),
-  }))
-
-  const tasks: TaskItem[] = (tasksData?.tasks ?? []).map((t) => ({
-    ...t,
-    id: uid(),
-    completed: false,
-    priority: t.priority ?? 'medium',
-  }))
-
-  return {
+  return normalizePlan({
     id: uid(),
     goal: userGoal,
     createdAt: Date.now(),
+    updatedAt: Date.now(),
     motivation,
     overview,
     timeline,
     tasks,
     document: document || overview,
-  }
+    note: '',
+    status: 'active',
+  })
 }

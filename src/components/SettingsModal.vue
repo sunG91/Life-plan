@@ -71,6 +71,12 @@ function useExampleModel(id: string) {
                   创建并填入 API Key
                 </li>
               </ol>
+              <p class="text-xs text-indigo-700/80 pt-1 border-t border-indigo-100">
+                参考文档：
+                <a href="https://www.volcengine.com/docs/82379/2121998?lang=zh" target="_blank" rel="noopener" class="underline">在线推理（常规）</a>
+                ·
+                <a href="https://www.volcengine.com/docs/82379/2123275?lang=zh" target="_blank" rel="noopener" class="underline">流式输出</a>
+              </p>
             </div>
 
             <div class="space-y-4">
@@ -109,7 +115,7 @@ function useExampleModel(id: string) {
                   placeholder="ep-2024xxxxxxxx-xxxxx"
                   class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition"
                 />
-                <p class="mt-1.5 text-xs text-slate-500">在控制台“推理接入点”页面复制，无需单独开通 Model ID</p>
+                <p class="mt-1.5 text-xs text-slate-500">在控制台创建「在线推理」接入点并确保状态为运行中</p>
               </div>
 
               <div v-else>

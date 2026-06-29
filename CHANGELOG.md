@@ -12,6 +12,7 @@ This project follows [Semantic Versioning](https://semver.org/).
 - Five-agent orchestration: inspiration, routing, timeline, tasks, and document
 - Interactive timeline view and checkable task list
 - Markdown and PDF export for planning documents
+- Local career plan archive with notes, search, and JSON backup
 - Responsive layout for mobile and desktop
 
 ### Author

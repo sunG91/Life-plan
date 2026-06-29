@@ -3,7 +3,7 @@
 | Document | Description |
 |----------|-------------|
 | [api-setup.md](./api-setup.md) | Volcengine Ark / Doubao API configuration & troubleshooting |
-| [development.md](./development.md) | Local development, architecture, and customization |
+| [development.md](./development.md) | Local development, architecture, records, and customization |
 
 ← Back to [README](../README.md)
 

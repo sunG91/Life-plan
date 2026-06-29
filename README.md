@@ -31,6 +31,7 @@ Built on the [Volcengine Ark Doubao Chat API](https://www.volcengine.com/docs/82
   - *The Task Weaver* — steps you can actually take
   - *The Scribe* — a full planning document, ready to export
 - **Export** — Markdown and PDF, for the plan you want to keep
+- **Local Records** — Browse, search, annotate, archive, and back up career plans in browser storage
 - **Responsive Design** — equally at home on phone and desktop
 
 ---

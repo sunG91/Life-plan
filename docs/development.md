@@ -62,6 +62,7 @@ Prompts live in `src/agents/prompts.ts`.
 
 - **Chat** — streaming dialogue, quick goals, jump to planning
 - **Plan** — Overview · Timeline · Tasks · Document
+- **Records** — local archive with search, notes, archive status, JSON import/export
 
 ---
 

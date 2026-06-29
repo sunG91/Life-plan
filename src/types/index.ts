@@ -46,15 +46,27 @@ export interface TaskItem {
   phase?: string
 }
 
+export type PlanStatus = 'active' | 'archived'
+
 export interface LifePlan {
   id: string
   goal: string
   createdAt: number
+  updatedAt: number
   motivation: string
   overview: string
   timeline: TimelinePhase[]
   tasks: TaskItem[]
   document: string
+  note: string
+  status: PlanStatus
+}
+
+export interface PlanRecordExport {
+  version: 1
+  app: 'life-plan'
+  exportedAt: number
+  plans: LifePlan[]
 }
 
 export interface DoubaoMessage {

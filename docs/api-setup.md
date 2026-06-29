@@ -102,7 +102,7 @@ Example request:
 }
 ```
 
-Official docs: [Chat API](https://www.volcengine.com/docs/82379/1399008?lang=zh)
+Official docs: [Chat API](https://www.volcengine.com/docs/82379/1399008?lang=zh) · [Online Inference](https://www.volcengine.com/docs/82379/2121998?lang=zh) · [Streaming Output](https://www.volcengine.com/docs/82379/2123275?lang=zh)
 
 ---
 
