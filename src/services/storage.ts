@@ -59,7 +59,12 @@ export function loadPlans(): LifePlan[] {
 }
 
 export function savePlans(plans: LifePlan[]): void {
-  localStorage.setItem(PLANS_KEY, JSON.stringify(plans))
+  try {
+    localStorage.setItem(PLANS_KEY, JSON.stringify(plans))
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    throw new Error(`本地档案保存失败：${message}。请检查浏览器存储空间，或勿在隐私/无痕模式下使用。`)
+  }
 }
 
 export function loadChatHistory<T>(): T[] {

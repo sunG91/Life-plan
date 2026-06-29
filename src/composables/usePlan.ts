@@ -16,8 +16,53 @@ const currentPlan = ref<LifePlan | null>(plans.value[0] ?? null)
 const planning = ref(false)
 const agentStatuses = ref<AgentStatus[]>([])
 
+let persistTimer: ReturnType<typeof setTimeout> | null = null
+
 function touchPlan(plan: LifePlan): LifePlan {
   return { ...plan, updatedAt: Date.now() }
+}
+
+function isMeaningfulPlan(plan: LifePlan): boolean {
+  return !!(
+    plan.motivation.trim()
+    || plan.overview.trim()
+    || plan.document.trim()
+    || plan.timeline.length
+    || plan.tasks.length
+  )
+}
+
+function persistPlans(immediate = false) {
+  if (persistTimer) {
+    clearTimeout(persistTimer)
+    persistTimer = null
+  }
+
+  const write = () => {
+    savePlans(plans.value)
+  }
+
+  if (immediate) {
+    write()
+    return
+  }
+
+  persistTimer = setTimeout(write, 500)
+}
+
+function upsertPlan(plan: LifePlan, immediate = false) {
+  const normalized = normalizePlan(plan)
+  const index = plans.value.findIndex((p) => p.id === normalized.id)
+  if (index >= 0) {
+    plans.value[index] = normalized
+    plans.value = [...plans.value]
+  } else {
+    plans.value = [normalized, ...plans.value]
+  }
+  if (currentPlan.value?.id === normalized.id) {
+    currentPlan.value = { ...normalized }
+  }
+  persistPlans(immediate)
 }
 
 function syncCurrent(planId: string, updater: (plan: LifePlan) => LifePlan) {
@@ -25,10 +70,11 @@ function syncCurrent(planId: string, updater: (plan: LifePlan) => LifePlan) {
   if (index < 0) return
   const next = updater(plans.value[index])
   plans.value[index] = next
+  plans.value = [...plans.value]
   if (currentPlan.value?.id === planId) {
     currentPlan.value = { ...next }
   }
-  savePlans(plans.value)
+  persistPlans(true)
 }
 
 export function usePlan() {
@@ -49,6 +95,7 @@ export function usePlan() {
       status: 'active',
     })
     currentPlan.value = draft
+    upsertPlan(draft, true)
 
     try {
       const plan = await orchestratePlan(
@@ -58,11 +105,13 @@ export function usePlan() {
           agentStatuses.value = statuses
         },
         (patch) => {
-          currentPlan.value = normalizePlan({
+          const next = normalizePlan({
             ...(currentPlan.value ?? draft),
             ...patch,
             updatedAt: Date.now(),
           })
+          currentPlan.value = next
+          upsertPlan(next)
         },
       )
 
@@ -75,12 +124,15 @@ export function usePlan() {
         status: draft.status,
       })
 
-      plans.value = [finalPlan, ...plans.value.filter((p) => p.id !== finalPlan.id)]
       currentPlan.value = finalPlan
-      savePlans(plans.value)
+      upsertPlan(finalPlan, true)
       return finalPlan
     } catch (err) {
-      currentPlan.value = plans.value[0] ?? null
+      if (currentPlan.value && isMeaningfulPlan(currentPlan.value)) {
+        upsertPlan(currentPlan.value, true)
+      } else {
+        currentPlan.value = plans.value[0] ?? null
+      }
       throw err
     } finally {
       planning.value = false
@@ -113,7 +165,7 @@ export function usePlan() {
     if (currentPlan.value?.id === planId) {
       currentPlan.value = plans.value[0] ?? null
     }
-    savePlans(plans.value)
+    persistPlans(true)
   }
 
   function exportAllRecords() {
@@ -147,8 +199,18 @@ export function usePlan() {
     }
 
     currentPlan.value = plans.value[0] ?? null
-    savePlans(plans.value)
+    persistPlans(true)
     return imported.length
+  }
+
+  function reloadPlans() {
+    plans.value = loadPlans()
+    if (currentPlan.value) {
+      const latest = plans.value.find((p) => p.id === currentPlan.value!.id)
+      currentPlan.value = latest ?? plans.value[0] ?? null
+    } else {
+      currentPlan.value = plans.value[0] ?? null
+    }
   }
 
   function taskProgress(plan: LifePlan): number {
@@ -172,5 +234,6 @@ export function usePlan() {
     exportSingleRecord,
     importRecords,
     taskProgress,
+    reloadPlans,
   }
 }

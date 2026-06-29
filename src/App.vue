@@ -25,6 +25,7 @@ const {
   exportSingleRecord,
   importRecords,
   taskProgress,
+  reloadPlans,
 } = usePlan()
 
 const showSettings = ref(false)
@@ -129,7 +130,7 @@ async function handleImport(file: File, mode: 'merge' | 'replace') {
           :class="activeView === 'records'
             ? 'bg-white text-indigo-600 font-medium shadow-sm'
             : 'text-slate-500 hover:text-slate-700'"
-          @click="activeView = 'records'"
+          @click="activeView = 'records'; reloadPlans()"
         >
           档案
           <span v-if="plans.length" class="ml-1 text-xs opacity-60">{{ plans.length }}</span>
